@@ -1,0 +1,101 @@
+import numpy as np
+import pandas as pd
+import statsmodels
+import matplotlib.pyplot as plt
+
+from sklearn import preprocessing
+from sklearn.preprocessing import LabelEncoder
+
+from sklearn import model_selection
+from sklearn.metrics import accuracy_score
+from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier, export_graphviz
+import keras
+from keras.models import Sequential
+from keras.layers import Dense
+
+df = pd.read_csv("C:\\Users\\Samir Prasun\\Desktop\\Spark Cognition\\marketing_training_new.csv")  ## Read training datasets
+
+def cap_data(df):                                                    ## Cap the outliers to 99th and 1st percentile
+    for col in df.columns:
+        print("capping the ",col)
+        if (((df[col].dtype)=='float64') | ((df[col].dtype)=='int64')):
+            percentiles = df[col].quantile([0.01,0.99]).values
+            df[col][df[col] <= percentiles[0]] = percentiles[0]
+            df[col][df[col] >= percentiles[1]] = percentiles[1]
+        else:
+            df[col]=df[col]
+    return df
+
+df = df.apply(lambda x:x.fillna(x.value_counts().index[0]))   ## impute missing values with the most frequent value in that column
+
+
+var_mod = ['profession','marital','schooling','default','housing','loan','contact', 'month', 'day_of_week', 'poutcome', 'responded']
+le = LabelEncoder()
+for i in var_mod:
+    df[i] = le.fit_transform(df[i])
+
+
+array=df.values
+X = array[:,:21]
+Y = array[:,21]
+x_train, x_test, y_train, y_test = model_selection.train_test_split(X, Y, test_size=0.2, random_state=7)
+
+model_Log = LogisticRegression()
+model_Log.fit(x_train,y_train)
+predictions = model_Log.predict(x_test)
+print(accuracy_score(y_test, predictions))
+
+model = DecisionTreeClassifier()
+model.fit(x_train,y_train)
+predictions = model.predict(x_test)
+print(accuracy_score(y_test, predictions))
+
+model = RandomForestClassifier(n_estimators=100)
+model.fit(x_train,y_train)
+predictions = model.predict(x_test)
+print(accuracy_score(y_test, predictions))
+
+model = Sequential()
+model.add(Dense(12, input_dim=21, activation='relu'))
+model.add(Dense(8, activation='relu'))
+model.add(Dense(1, activation='sigmoid'))
+model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+model.fit(x_train, y_train, epochs=20, batch_size=10)
+	
+...
+# evaluate the keras model
+_, accuracy = model.evaluate(x_train, y_train)
+print('Accuracy: %.2f' % (accuracy*100))
+
+## Use the trained model to predict the new data set 
+df_New=pd.read_csv("C:\\Users\\Samir Prasun\\Desktop\\Spark Cognition\\marketing_test.csv") ## Read new data set
+
+df_New = df_New.apply(lambda x:x.fillna(x.value_counts().index[0])) ## impute missing values with the most frequent value in that column
+
+
+var_mod_New = ['profession','marital','schooling','default','housing','loan','contact', 'month', 'day_of_week', 'poutcome']
+le_New = LabelEncoder()
+for i in var_mod_New:
+    df_New[i] = le_New.fit_transform(df_New[i])
+    
+array_New=df_New.values
+X_New = array_New[:,:21]
+
+
+Y_New=model_Log.predict(X_New) # predict the response variable for new dataset
+
+Round=Y_New.round()  # response variable is the probability of yes or no, which needs to be rounded
+Responded_New=(le.inverse_transform(Round.astype(int))) # decode the response variable using string variables which is 'Yes' or 'No'
+print(Responded_New) 
+
+resultFyle = open("C:\\Users\\Samir Prasun\\Desktop\\Spark Cognition\\Output.csv",'w') ## steps to write the output or predicted data into a new output file "Output.csv"
+# Write data to file
+for r in Responded_New:
+    resultFyle.write(r + "\n")
+resultFyle.close()
+
